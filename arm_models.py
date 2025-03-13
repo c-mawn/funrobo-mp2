@@ -793,6 +793,7 @@ class FiveDOFRobot:
             self.theta[2] = float(np.pi + beta)
             print(f"{self.theta=}")
 
+        self.calc_forward_kinematics(self.theta, radians=True)
         self.calc_robot_points()
 
         ########################################
