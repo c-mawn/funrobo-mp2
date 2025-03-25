@@ -783,25 +783,41 @@ class FiveDOFRobot:
         Pw = ee_location - (self.l4 + self.l5) * (
             rot_mat @ np.transpose(np.array([0, 0, 1], dtype=float))
         )
+        print(f"{Pw=}")
+        print(f"{-self.l3=}")
+        print(f"{(self.l1 + self.l2)=}")
 
         s = Pw[2] - self.l1
         r = np.sqrt((Pw[0] ** 2) + (Pw[1] ** 2))
         L = np.sqrt((s**2) + (r**2))
-        beta = np.arccos((self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3))
-        phi = np.arcsin((self.l3 * np.sin(np.pi - beta)) / L)
+        beta = np.arccos(
+            np.clip((self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3), -1, 1)
+        )
 
         if soln == 1:
-            self.theta[0] = float(np.pi + np.arctan2(Pw[1], Pw[0]))
-            self.theta[1] = float(np.arctan2(s, r) - phi)
-            self.theta[2] = float(-np.pi - beta)
+            self.theta[0] = float(np.arctan2(Pw[1], Pw[0]))
+            self.theta[2] = float(-np.pi + beta)
+            self.theta[1] = float(
+                np.arctan2(s, r)
+                - np.arctan2(
+                    self.l3 * np.sin(-self.theta[2]),
+                    (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                )
+            )
             print(f"{self.theta=} {L=}")
             print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
             print(f"{rot_mat=}")
 
         else:
-            self.theta[0] = float(np.arctan2(Pw[1], Pw[0]))
-            self.theta[1] = float(np.arctan2(s, r) + phi)
-            self.theta[2] = float(-np.pi + beta)
+            self.theta[0] = float(np.pi + np.arctan2(Pw[1], Pw[0]))
+            self.theta[2] = float(np.pi - beta)
+            self.theta[1] = float(
+                np.arctan2(s, r)
+                + np.arctan2(
+                    self.l3 * np.sin(-self.theta[2]),
+                    (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                )
+            )
             print(f"{self.theta=} {L=}")
             print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
             print(f"{rot_mat=}")
