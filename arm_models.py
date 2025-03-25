@@ -830,9 +830,37 @@ class FiveDOFRobot:
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
         """Calculate numerical inverse kinematics based on input coordinates."""
 
+        x_ee, y_ee, z_ee = EE.x, EE.y, EE.z
+        # rot_x, rot_y, rot_z = EE.rotx, EE.roty, EE.rotz
+
+        ########################################
+        # insert your code here
+        theta = self.theta
+
+        i = 0
+
+        while i < ilimit:
+            self.calc_forward_kinematics(theta, radians=True)
+            # err = np.sqrt(
+            #     (self.ee.x - x_ee) ** 2
+            #     + (self.ee.y - y_ee) ** 2
+            #     + (self.ee.z - z_ee) ** 2
+            # )
+            err = np.transpose([x_ee - self.ee.x, y_ee - self.ee.y, z_ee - self.ee.z])
+
+            if np.linalg.norm(err) > tol:
+                theta = theta + (self.inverse_jacobian() @ err) * 0.1
+                print(self.inverse_jacobian() @ err)
+            else:
+                print("position found")
+                self.theta = theta
+                break
+
+            i += 1
+
         ########################################
 
-        # insert your code here
+        self.calc_robot_points()
 
         ########################################
         self.calc_forward_kinematics(self.theta, radians=True)
