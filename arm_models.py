@@ -666,7 +666,7 @@ class FiveDOFRobot:
 
         ########################################
 
-    def calc_forward_kinematics(self, theta: list, radians=False):
+    def calc_forward_kinematics(self, theta: list, radians=False, update_robot=True):
         """
         Calculate forward kinematics based on the provided joint angles.
 
@@ -685,7 +685,8 @@ class FiveDOFRobot:
 
         self.H05 = self.H_01 @ self.H_12 @ self.H_23 @ self.H_34 @ self.H_45
         self.T = [self.H_01, self.H_12, self.H_23, self.H_34, self.H_45]
-        self.theta = theta
+        if update_robot:
+            self.theta = theta
         # Debug prints to verify the transformation matrices
         # print("Transformation Matrices:")
         # for i, T in enumerate(self.T):
@@ -778,7 +779,9 @@ class FiveDOFRobot:
         """
         ########################################
 
-        possible_solutions = [[0, 0, 0, 0, 0]] * 8
+        possible_solutions = []
+        for i in range(8):
+            possible_solutions.append([0, 0, 0, 0, 0])
 
         euler_angles = (EE.rotx, EE.roty, EE.rotz)
         print(f"{euler_angles=}")
@@ -814,27 +817,46 @@ class FiveDOFRobot:
         # 2: offset -- (-) -- (+)
         # 3: offset -- (+) -- (-)
         # 4: offset -- (-) -- (-)
-        print(f"{possible_solutions=}")
+        # print(f"{possible_solutions=}")
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution  # should be just 5 0s
             if i < (len(possible_solutions) / 2):
                 poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
+                # print(f"{i}: norm")
             else:
                 poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
+                print(f"{i}: offset")
+            # print(f"{poss_soln=}")
             possible_solutions[i] = poss_soln
+            # print(f"{possible_solutions=}")
 
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution
             if i % 2 is 0:
                 poss_soln[2] = float(-np.pi + beta)
+                # print(f"{i}: pos")
             else:
                 float(np.pi - beta)
+                # print(f"{i}: neg")
             possible_solutions[i] = poss_soln
+            # print(f"{possible_solutions=}")
 
         for i, solution in enumerate(possible_solutions):
-            poss_soln = solution
             if i % 2 == 0:
                 for j in range(2):
+                    poss_soln = possible_solutions[2 * i + j]
+                    poss_soln[1] = float(
+                        np.arctan2(-r, s)
+                        - np.arctan2(
+                            self.l3 * np.sin(-poss_soln[2]),
+                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
+                        )
+                    )
+                    # print(f"{i}: neg")
+                    possible_solutions[2 * i + j] = poss_soln
+            else:
+                for j in range(2):
+                    poss_soln = possible_solutions[2 * i + j]
                     poss_soln[1] = float(
                         np.arctan2(r, s)
                         - np.arctan2(
@@ -842,19 +864,11 @@ class FiveDOFRobot:
                             (self.l2 + self.l3 * np.cos(-poss_soln[2])),
                         )
                     )
-                    possible_solutions[2 * i + j] = poss_soln
-            else:
-                for j in range(2):
-                    poss_soln[1] = float(
-                        np.arctan2(r, s)
-                        + np.arctan2(
-                            self.l3 * np.sin(-poss_soln[2]),
-                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
-                        )
-                    )
+                    # print(f"{i}: pos")
                     possible_solutions[2 * i + j] = poss_soln
             if i == 3:
                 break
+            # print(f"{possible_solutions=}")
 
         print(f"{possible_solutions=}")
 
@@ -862,12 +876,20 @@ class FiveDOFRobot:
         valid_solutions = []
 
         for solution in possible_solutions:
+            self.calc_forward_kinematics(solution, True, False)
+            EE_points_desired = [EE.x, EE.y, EE.z]  # desired
+            EE_points_calc = self.points[5][:3]
             valid_thetas = [False] * 5
             for i, theta in enumerate(solution):
                 if (
                     min(self.theta_limits[i][0], self.theta_limits[i][1])
                     < theta
                     < max(self.theta_limits[i][0], self.theta_limits[i][1])
+                ) and (
+                    all(
+                        abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
+                        for k in range(3)
+                    )
                 ):
                     valid_thetas[i] = True
             if all(valid_thetas):
@@ -875,7 +897,7 @@ class FiveDOFRobot:
 
         print(f"{valid_solutions=}")
 
-        if soln == 0:
+        if soln == 0 or len(valid_solutions) == 1:
             self.theta = valid_solutions[0]
         else:
             self.theta = valid_solutions[1]
@@ -976,7 +998,7 @@ class FiveDOFRobot:
         # Recompute robot points based on updated joint angles
         self.calc_forward_kinematics(self.theta, radians=True)
 
-    def calc_robot_points(self):
+    def calc_robot_points(self, update_robot=True):
         """Calculates the main arm points using the current joint angles"""
 
         # Initialize points[0] to the base (origin)
@@ -991,21 +1013,22 @@ class FiveDOFRobot:
         for i in range(1, 6):
             self.points[i] = T_cumulative[i] @ self.points[0]
 
-        # Calculate EE position and rotation
-        self.EE_axes = T_cumulative[-1] @ np.array(
-            [0.075, 0.075, 0.075, 1]
-        )  # End-effector axes
-        self.T_ee = T_cumulative[-1]  # Final transformation matrix for EE
+        if update_robot:
+            # Calculate EE position and rotation
+            self.EE_axes = T_cumulative[-1] @ np.array(
+                [0.075, 0.075, 0.075, 1]
+            )  # End-effector axes
+            self.T_ee = T_cumulative[-1]  # Final transformation matrix for EE
 
-        # Set the end effector (EE) position
-        self.ee.x, self.ee.y, self.ee.z = self.points[-1][:3]
+            # Set the end effector (EE) position
+            self.ee.x, self.ee.y, self.ee.z = self.points[-1][:3]
 
-        # Extract and assign the RPY (roll, pitch, yaw) from the rotation matrix
-        rpy = rotm_to_euler(self.T_ee[:3, :3])
-        self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[0], rpy[1], rpy[2]
+            # Extract and assign the RPY (roll, pitch, yaw) from the rotation matrix
+            rpy = rotm_to_euler(self.T_ee[:3, :3])
+            self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[0], rpy[1], rpy[2]
 
-        # Calculate the EE axes in space (in the base frame)
-        self.EE = [self.ee.x, self.ee.y, self.ee.z]
-        self.EE_axes = np.array(
-            [self.T_ee[:3, i] * 0.075 + self.points[-1][:3] for i in range(3)]
-        )
+            # Calculate the EE axes in space (in the base frame)
+            self.EE = [self.ee.x, self.ee.y, self.ee.z]
+            self.EE_axes = np.array(
+                [self.T_ee[:3, i] * 0.075 + self.points[-1][:3] for i in range(3)]
+            )
