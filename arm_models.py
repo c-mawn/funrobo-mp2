@@ -1,7 +1,13 @@
 from math import sin, cos
 import numpy as np
 from matplotlib.figure import Figure
-from helper_fcns.utils import EndEffector, rotm_to_euler, dh_to_matrix, euler_to_rotm
+from helper_fcns.utils import (
+    EndEffector,
+    rotm_to_euler,
+    dh_to_matrix,
+    euler_to_rotm,
+    wraptopi,
+)
 
 PI = 3.1415926535897932384
 np.set_printoptions(precision=3)
@@ -222,12 +228,12 @@ class Robot:
 
         # add text at bottom of window
         pose_text = "End-effector Pose:      [ "
-        pose_text += f"X: {round(EE.x,2)},  "
-        pose_text += f"Y: {round(EE.y,2)},  "
-        pose_text += f"Z: {round(EE.z,2)},  "
-        pose_text += f"RotX: {round(EE.rotx,2)},  "
-        pose_text += f"RotY: {round(EE.roty,2)},  "
-        pose_text += f"RotZ: {round(EE.rotz,2)}  "
+        pose_text += f"X: {round(EE.x,4)},  "
+        pose_text += f"Y: {round(EE.y,4)},  "
+        pose_text += f"Z: {round(EE.z,4)},  "
+        pose_text += f"RotX: {round(EE.rotx,4)},  "
+        pose_text += f"RotY: {round(EE.roty,4)},  "
+        pose_text += f"RotZ: {round(EE.rotz,4)}  "
         pose_text += " ]"
 
         theta_text = "Joint Positions (deg/m):     ["
@@ -237,7 +243,7 @@ class Robot:
 
         textstr = pose_text + "\n" + theta_text
         self.sub1.text2D(
-            0.3, 0.02, textstr, fontsize=13, transform=self.fig.transFigure
+            0.2, 0.02, textstr, fontsize=13, transform=self.fig.transFigure
         )
 
         self.sub1.set_xlim(-self.plot_limits[0], self.plot_limits[0])
@@ -772,6 +778,8 @@ class FiveDOFRobot:
         """
         ########################################
 
+        possible_solutions = [[0, 0, 0, 0, 0]] * 8
+
         euler_angles = (EE.rotx, EE.roty, EE.rotz)
         print(f"{euler_angles=}")
         R = euler_to_rotm(euler_angles)
@@ -794,33 +802,89 @@ class FiveDOFRobot:
             np.clip((self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3), -1, 1)
         )
 
-        if soln == 1:
-            self.theta[0] = float(np.arctan2(Pw[1], Pw[0]))
-            self.theta[2] = float(-np.pi + beta)
-            self.theta[1] = float(
-                np.arctan2(s, r)
-                - np.arctan2(
-                    self.l3 * np.sin(-self.theta[2]),
-                    (self.l2 + self.l3 * np.cos(-self.theta[2])),
-                )
-            )
-            print(f"{self.theta=} {L=}")
-            print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
-            print(f"{rot_mat=}")
+        # Add both theta 1 cases to seperate poss solutions
+        # for each of those add a possible theta 3 poss solution
+        # for each of those 4 poss solns, calc theta 2
 
-        else:
-            self.theta[0] = float(np.pi + np.arctan2(Pw[1], Pw[0]))
-            self.theta[2] = float(np.pi - beta)
-            self.theta[1] = float(
-                np.arctan2(s, r)
-                + np.arctan2(
-                    self.l3 * np.sin(-self.theta[2]),
-                    (self.l2 + self.l3 * np.cos(-self.theta[2])),
-                )
-            )
-            print(f"{self.theta=} {L=}")
-            print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
-            print(f"{rot_mat=}")
+        # 1: norm ---- (+) -- (+)
+        # 2: norm ---- (-) -- (+)
+        # 3: norm ---- (+) -- (-)
+        # 4: norm ---- (-) -- (-)
+        # 1: offset -- (+) -- (+)
+        # 2: offset -- (-) -- (+)
+        # 3: offset -- (+) -- (-)
+        # 4: offset -- (-) -- (-)
+
+        for i, solution in enumerate(possible_solutions):
+            poss_soln = solution  # should be just 5 0s
+            if i < (len(possible_solutions / 2)):
+                poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
+            else:
+                poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
+            possible_solutions[i] = poss_soln
+
+        for i, solution in enumerate(possible_solutions):
+            poss_soln = solution
+            if i % 2 is 0:
+                poss_soln[2] = float(-np.pi + beta)
+            else:
+                float(np.pi - beta)
+            possible_solutions[i] = poss_soln
+
+        for i, solution in enumerate(possible_solutions):
+            poss_soln = solution
+            if i % 2 == 0:
+                for j in range(2):
+                    poss_soln[1] = float(
+                        np.arctan2(r, s)
+                        - np.arctan2(
+                            self.l3 * np.sin(-self.theta[2]),
+                            (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                        )
+                    )
+                    possible_solutions[2 * i + j] = poss_soln
+            else:
+                for j in range(2):
+                    poss_soln[1] = float(
+                        np.arctan2(r, s)
+                        + np.arctan2(
+                            self.l3 * np.sin(-self.theta[2]),
+                            (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                        )
+                    )
+                    possible_solutions[2 * i + j] = poss_soln
+            if i == 4:
+                break
+
+        print(f"{possible_solutions=}")
+
+        # if soln == 1:
+        #     self.theta[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
+        #     self.theta[2] = float(wraptopi(-np.pi + beta))
+        #     self.theta[1] = float(
+        #         np.arctan2(r, s)
+        #         - np.arctan2(
+        #             self.l3 * np.sin(-self.theta[2]),
+        #             (self.l2 + self.l3 * np.cos(-self.theta[2])),
+        #         )
+        #     )
+        #     print(f"{self.theta=} {L=}")
+        #     print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
+        #     print(f"{rot_mat=}")
+
+        # else:
+        #     self.theta[0] = float(np.arctan2(Pw[1], Pw[0]))
+        #     self.theta[2] = float(wraptopi(np.pi - beta))
+        #     self.theta[1] = float(
+        #         np.arctan2(r, s)
+        #         + np.arctan2(
+        #             self.l3 * np.sin(-self.theta[2]),
+        #             (self.l2 + self.l3 * np.cos(-self.theta[2])),
+        #         )
+        #     )
+        #     print(f"{self.theta=} {L=}")
+        #     print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
+        #     print(f"{rot_mat=}")
 
         self.calc_forward_kinematics(self.theta, radians=True)
         # self.calc_robot_points()
@@ -911,14 +975,12 @@ class FiveDOFRobot:
         )  # End-effector axes
         self.T_ee = T_cumulative[-1]  # Final transformation matrix for EE
 
-        # print(self.points)
-
         # Set the end effector (EE) position
         self.ee.x, self.ee.y, self.ee.z = self.points[-1][:3]
 
         # Extract and assign the RPY (roll, pitch, yaw) from the rotation matrix
         rpy = rotm_to_euler(self.T_ee[:3, :3])
-        self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[2], rpy[1], rpy[0]
+        self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[0], rpy[1], rpy[2]
 
         # Calculate the EE axes in space (in the base frame)
         self.EE = [self.ee.x, self.ee.y, self.ee.z]
