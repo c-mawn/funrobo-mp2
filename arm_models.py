@@ -814,10 +814,10 @@ class FiveDOFRobot:
         # 2: offset -- (-) -- (+)
         # 3: offset -- (+) -- (-)
         # 4: offset -- (-) -- (-)
-
+        print(f"{possible_solutions=}")
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution  # should be just 5 0s
-            if i < (len(possible_solutions / 2)):
+            if i < (len(possible_solutions) / 2):
                 poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
             else:
                 poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
@@ -838,8 +838,8 @@ class FiveDOFRobot:
                     poss_soln[1] = float(
                         np.arctan2(r, s)
                         - np.arctan2(
-                            self.l3 * np.sin(-self.theta[2]),
-                            (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                            self.l3 * np.sin(-poss_soln[2]),
+                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
                         )
                     )
                     possible_solutions[2 * i + j] = poss_soln
@@ -848,15 +848,37 @@ class FiveDOFRobot:
                     poss_soln[1] = float(
                         np.arctan2(r, s)
                         + np.arctan2(
-                            self.l3 * np.sin(-self.theta[2]),
-                            (self.l2 + self.l3 * np.cos(-self.theta[2])),
+                            self.l3 * np.sin(-poss_soln[2]),
+                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
                         )
                     )
                     possible_solutions[2 * i + j] = poss_soln
-            if i == 4:
+            if i == 3:
                 break
 
         print(f"{possible_solutions=}")
+
+        # Checking to see which of the 8 solutions are valid
+        valid_solutions = []
+
+        for solution in possible_solutions:
+            valid_thetas = [False] * 5
+            for i, theta in enumerate(solution):
+                if (
+                    min(self.theta_limits[i][0], self.theta_limits[i][1])
+                    < theta
+                    < max(self.theta_limits[i][0], self.theta_limits[i][1])
+                ):
+                    valid_thetas[i] = True
+            if all(valid_thetas):
+                valid_solutions.append(solution)
+
+        print(f"{valid_solutions=}")
+
+        if soln == 0:
+            self.theta = valid_solutions[0]
+        else:
+            self.theta = valid_solutions[1]
 
         # if soln == 1:
         #     self.theta[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
