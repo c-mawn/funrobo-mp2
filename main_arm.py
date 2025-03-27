@@ -256,7 +256,7 @@ class Visualizer:
         """
         # self.robot.update_plot(angles=theta)
         try:
-            print(f'{theta=}')
+            print(f"{theta=}")
             self.robot.update_plot(angles=theta)
 
             self.canvas.draw()
