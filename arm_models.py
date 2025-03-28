@@ -779,31 +779,75 @@ class FiveDOFRobot:
         """
         ########################################
 
-        possible_solutions = []
-        for i in range(8):
-            possible_solutions.append([0, 0, 0, 0, 0])
+        # possible_solutions = []
+        # for i in range(8):
+        #     possible_solutions.append([0, 0, 0, 0, 0])
 
         euler_angles = (EE.rotx, EE.roty, EE.rotz)
         print(f"{euler_angles=}")
-        R = euler_to_rotm(euler_angles)
+        R = np.array(euler_to_rotm(euler_angles), dtype=float)
         print(f"{R=}")
-        rot_mat = np.array(list(R), dtype=float)
+        # rot_mat = np.array(list(R), dtype=float)
 
         ee_location = np.array([EE.x, EE.y, EE.z], dtype=float)
+        print(f"{ee_location=}")
         Pw = np.array([], dtype=float)
         Pw = ee_location - (self.l4 + self.l5) * (
-            rot_mat @ np.transpose(np.array([0, 0, 1], dtype=float))
+            R @ np.transpose(np.array([0, 0, 1], dtype=float))
         )
         print(f"{Pw=}")
-        print(f"{-self.l3=}")
-        print(f"{(self.l1 + self.l2)=}")
 
         s = Pw[2] - self.l1
+        # print(f"{s=}")
         r = np.sqrt((Pw[0] ** 2) + (Pw[1] ** 2))
+        # print(f"{r=}")
         L = np.sqrt((s**2) + (r**2))
+        # print(f"{L=}")
         beta = np.arccos(
             np.clip((self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3), -1, 1)
         )
+        # print(f"{beta=}")
+
+        t1 = np.arctan2(Pw[1], Pw[0]) + np.pi
+        # print(f"{t1=}")
+
+        if soln == 1:
+            t3 = -np.pi + beta
+            t2 = np.arctan2(r, s) - np.arctan2(
+                self.l3 * np.sin(-t3), (self.l2 + self.l3 * np.cos(-t3))
+            )
+        else:
+            t3 = np.pi - beta
+            t2 = np.arctan2(r, s) - np.arctan2(
+                self.l3 * np.sin(-t3), (self.l2 + self.l3 * np.cos(-t3))
+            )
+        # print(f"{t2=}")
+        # print(f"{t3=}")
+
+        r_1 = np.array(
+            [[np.cos(t1), 0, np.sin(t1)], [np.sin(t1), 0, -np.cos(t1)], [0, 1, 0]]
+        )
+        r_1_5 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+        r_2 = np.array(
+            [[np.cos(t2), np.sin(t2), 0], [np.sin(t2), -np.cos(t2), 0], [0, 0, -1]]
+        )
+        r_3 = np.array(
+            [[np.cos(t3), np.sin(t3), 0], [np.sin(t3), -np.cos(t3), 0], [0, 0, -1]]
+        )
+
+        r_0_3 = r_1 @ r_1_5 @ r_2 @ r_3
+        # print(f"{r_0_3=}")
+
+        r_3_5 = np.transpose(r_0_3) @ R
+        # print(f"{r_3_5=}")
+
+        t4 = np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
+        # print(f"{t4=}")
+        t5 = np.arctan2(-r_3_5[2, 0], -r_3_5[2, 1])
+        # print(f"{t5=}")
+
+        self.theta = [t1, t2, t3, t4, t5]
+        print(f"{self.theta=}")
 
         # Add both theta 1 cases to seperate poss solutions
         # for each of those add a possible theta 3 poss solution
@@ -818,89 +862,89 @@ class FiveDOFRobot:
         # 3: offset -- (+) -- (-)
         # 4: offset -- (-) -- (-)
         # print(f"{possible_solutions=}")
-        for i, solution in enumerate(possible_solutions):
-            poss_soln = solution  # should be just 5 0s
-            if i < (len(possible_solutions) / 2):
-                poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
-                # print(f"{i}: norm")
-            else:
-                poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
-                print(f"{i}: offset")
-            # print(f"{poss_soln=}")
-            possible_solutions[i] = poss_soln
-            # print(f"{possible_solutions=}")
+        # for i, solution in enumerate(possible_solutions):
+        #     poss_soln = solution  # should be just 5 0s
+        #     if i < (len(possible_solutions) / 2):
+        #         poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
+        #         # print(f"{i}: norm")
+        #     else:
+        #         poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
+        #         print(f"{i}: offset")
+        #     # print(f"{poss_soln=}")
+        #     possible_solutions[i] = poss_soln
+        #     # print(f"{possible_solutions=}")
 
-        for i, solution in enumerate(possible_solutions):
-            poss_soln = solution
-            if i % 2 is 0:
-                poss_soln[2] = float(-np.pi + beta)
-                # print(f"{i}: pos")
-            else:
-                float(np.pi - beta)
-                # print(f"{i}: neg")
-            possible_solutions[i] = poss_soln
-            # print(f"{possible_solutions=}")
+        # for i, solution in enumerate(possible_solutions):
+        #     poss_soln = solution
+        #     if i % 2 is 0:
+        #         poss_soln[2] = float(-np.pi + beta)
+        #         # print(f"{i}: pos")
+        #     else:
+        #         float(np.pi - beta)
+        #         # print(f"{i}: neg")
+        #     possible_solutions[i] = poss_soln
+        #     # print(f"{possible_solutions=}")
 
-        for i, solution in enumerate(possible_solutions):
-            if i % 2 == 0:
-                for j in range(2):
-                    poss_soln = possible_solutions[2 * i + j]
-                    poss_soln[1] = float(
-                        np.arctan2(-r, s)
-                        - np.arctan2(
-                            self.l3 * np.sin(-poss_soln[2]),
-                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
-                        )
-                    )
-                    # print(f"{i}: neg")
-                    possible_solutions[2 * i + j] = poss_soln
-            else:
-                for j in range(2):
-                    poss_soln = possible_solutions[2 * i + j]
-                    poss_soln[1] = float(
-                        np.arctan2(r, s)
-                        - np.arctan2(
-                            self.l3 * np.sin(-poss_soln[2]),
-                            (self.l2 + self.l3 * np.cos(-poss_soln[2])),
-                        )
-                    )
-                    # print(f"{i}: pos")
-                    possible_solutions[2 * i + j] = poss_soln
-            if i == 3:
-                break
-            # print(f"{possible_solutions=}")
+        # for i, solution in enumerate(possible_solutions):
+        #     if i % 2 == 0:
+        #         for j in range(2):
+        #             poss_soln = possible_solutions[2 * i + j]
+        #             poss_soln[1] = float(
+        #                 np.arctan2(-r, s)
+        #                 - np.arctan2(
+        #                     self.l3 * np.sin(-poss_soln[2]),
+        #                     (self.l2 + self.l3 * np.cos(-poss_soln[2])),
+        #                 )
+        #             )
+        #             # print(f"{i}: neg")
+        #             possible_solutions[2 * i + j] = poss_soln
+        #     else:
+        #         for j in range(2):
+        #             poss_soln = possible_solutions[2 * i + j]
+        #             poss_soln[1] = float(
+        #                 np.arctan2(r, s)
+        #                 - np.arctan2(
+        #                     self.l3 * np.sin(-poss_soln[2]),
+        #                     (self.l2 + self.l3 * np.cos(-poss_soln[2])),
+        #                 )
+        #             )
+        #             # print(f"{i}: pos")
+        #             possible_solutions[2 * i + j] = poss_soln
+        #     if i == 3:
+        #         break
+        #     # print(f"{possible_solutions=}")
 
-        print(f"{possible_solutions=}")
+        # print(f"{possible_solutions=}")
 
-        # Checking to see which of the 8 solutions are valid
-        valid_solutions = []
+        # # Checking to see which of the 8 solutions are valid
+        # valid_solutions = []
 
-        for solution in possible_solutions:
-            self.calc_forward_kinematics(solution, True, False)
-            EE_points_desired = [EE.x, EE.y, EE.z]  # desired
-            EE_points_calc = self.points[5][:3]
-            valid_thetas = [False] * 5
-            for i, theta in enumerate(solution):
-                if (
-                    min(self.theta_limits[i][0], self.theta_limits[i][1])
-                    < theta
-                    < max(self.theta_limits[i][0], self.theta_limits[i][1])
-                ) and (
-                    all(
-                        abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
-                        for k in range(3)
-                    )
-                ):
-                    valid_thetas[i] = True
-            if all(valid_thetas):
-                valid_solutions.append(solution)
+        # for solution in possible_solutions:
+        #     self.calc_forward_kinematics(solution, True, False)
+        #     EE_points_desired = [EE.x, EE.y, EE.z]  # desired
+        #     EE_points_calc = self.points[5][:3]
+        #     valid_thetas = [False] * 5
+        #     for i, theta in enumerate(solution):
+        #         if (
+        #             min(self.theta_limits[i][0], self.theta_limits[i][1])
+        #             < theta
+        #             < max(self.theta_limits[i][0], self.theta_limits[i][1])
+        #         ) and (
+        #             all(
+        #                 abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
+        #                 for k in range(3)
+        #             )
+        #         ):
+        #             valid_thetas[i] = True
+        #     if all(valid_thetas):
+        #         valid_solutions.append(solution)
 
-        print(f"{valid_solutions=}")
+        # print(f"{valid_solutions=}")
 
-        if soln == 0 or len(valid_solutions) == 1:
-            self.theta = valid_solutions[0]
-        else:
-            self.theta = valid_solutions[1]
+        # if soln == 0 or len(valid_solutions) == 1:
+        #     self.theta = valid_solutions[0]
+        # else:
+        #     self.theta = valid_solutions[1]
 
         # if soln == 1:
         #     self.theta[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))

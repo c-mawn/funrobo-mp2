@@ -8,7 +8,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from arm_models import Robot
 from helper_fcns.utils import EndEffector
 import time
-from pynput import keyboard
+
+# from pynput import keyboard
 
 
 class Visualizer:
@@ -37,10 +38,10 @@ class Visualizer:
         self.vk_status_font = "black"
 
         # Keyboard listener for controlling velocity
-        self.listener = keyboard.Listener(
-            on_press=self.on_press, on_release=self.on_release
-        )
-        self.v = [0, 0, 0]
+        # self.listener = keyboard.Listener(
+        #     on_press=self.on_press, on_release=self.on_release
+        # )
+        # self.v = [0, 0, 0]
 
         # Create the control frame for the GUI
         self.control_frame = ttk.Frame(root)
@@ -162,25 +163,25 @@ class Visualizer:
         # ------------------------------------------------------------------------------------------------
         # Velocity kinematics
         # ------------------------------------------------------------------------------------------------
-        self.vk_entry_title = ttk.Label(
-            self.control_frame, text="Velocity Kinematics:", font=("Arial", 13, "bold")
-        )
-        self.vk_entry_title.grid(column=0, row=row_number, columnspan=2, pady=(0, 10))
-        row_number += 1
+        # self.vk_entry_title = ttk.Label(
+        #     self.control_frame, text="Velocity Kinematics:", font=("Arial", 13, "bold")
+        # )
+        # self.vk_entry_title.grid(column=0, row=row_number, columnspan=2, pady=(0, 10))
+        # row_number += 1
 
-        self.vk_activate_button = ttk.Button(
-            self.control_frame, text="Activate VK", command=self.activate_VK
-        )
-        self.vk_activate_button.grid(column=0, row=row_number, columnspan=1, pady=2)
+        # self.vk_activate_button = ttk.Button(
+        #     self.control_frame, text="Activate VK", command=self.activate_VK
+        # )
+        # self.vk_activate_button.grid(column=0, row=row_number, columnspan=1, pady=2)
 
-        self.vk_deactivate_button = ttk.Button(
-            self.control_frame, text="Deactivate VK", command=self.deactivate_VK
-        )
-        self.vk_deactivate_button.grid(column=1, row=row_number, columnspan=1, pady=2)
-        row_number += 1
+        # self.vk_deactivate_button = ttk.Button(
+        #     self.control_frame, text="Deactivate VK", command=self.deactivate_VK
+        # )
+        # self.vk_deactivate_button.grid(column=1, row=row_number, columnspan=1, pady=2)
+        # row_number += 1
 
         # Start the keyboard listener
-        self.listener.start()
+        # self.listener.start()
 
     def joints_from_sliders(self, val):
         """
@@ -280,22 +281,22 @@ class Visualizer:
 
         self.canvas.draw()
 
-    def activate_VK(self):
-        """
-        Activates velocity kinematics and starts continuously updating the robot's movement.
-        """
-        self.vk_status = True
-        while self.vk_status:
-            self.robot.move_velocity(self.v)
-            self.canvas.draw()
-            self.canvas.flush_events()
-            time.sleep(0.05)
+    # def activate_VK(self):
+    #     """
+    #     Activates velocity kinematics and starts continuously updating the robot's movement.
+    #     """
+    #     self.vk_status = True
+    #     while self.vk_status:
+    #         self.robot.move_velocity(self.v)
+    #         self.canvas.draw()
+    #         self.canvas.flush_events()
+    #         time.sleep(0.05)
 
-    def deactivate_VK(self):
-        """
-        Deactivates velocity kinematics, stopping the robot's movement.
-        """
-        self.vk_status = False
+    # def deactivate_VK(self):
+    #     """
+    #     Deactivates velocity kinematics, stopping the robot's movement.
+    #     """
+    #     self.vk_status = False
 
     def check_vk_status(self):
         """
@@ -306,48 +307,48 @@ class Visualizer:
         """
         return "Deactivated!" if not self.vk_status else "Activated!"
 
-    def on_press(self, key):
-        """
-        Handles key press events to control the velocity of the robot.
+    # def on_press(self, key):
+    #     """
+    #     Handles key press events to control the velocity of the robot.
 
-        Args:
-            key (pynput.keyboard.Key): The key that was pressed.
-        """
-        if self.vk_status:
-            if key == keyboard.Key.up:
-                self.v[1] = 1
-            elif key == keyboard.Key.down:
-                self.v[1] = -1
-            elif key == keyboard.Key.left:
-                self.v[0] = -1
-            elif key == keyboard.Key.right:
-                self.v[0] = 1
-            elif hasattr(key, "char"):
-                if key.char == "w":
-                    self.v[2] = 1
-                elif key.char == "s":
-                    self.v[2] = -1
+    #     Args:
+    #         key (pynput.keyboard.Key): The key that was pressed.
+    #     """
+    #     if self.vk_status:
+    #         if key == keyboard.Key.up:
+    #             self.v[1] = 1
+    #         elif key == keyboard.Key.down:
+    #             self.v[1] = -1
+    #         elif key == keyboard.Key.left:
+    #             self.v[0] = -1
+    #         elif key == keyboard.Key.right:
+    #             self.v[0] = 1
+    #         elif hasattr(key, "char"):
+    #             if key.char == "w":
+    #                 self.v[2] = 1
+    #             elif key.char == "s":
+    #                 self.v[2] = -1
 
-    def on_release(self, key):
-        """
-        Handles key release events to stop the robot's movement.
+    # def on_release(self, key):
+    #     """
+    #     Handles key release events to stop the robot's movement.
 
-        Args:
-            key (pynput.keyboard.Key): The key that was released.
-        """
-        if key == keyboard.Key.up:
-            self.v[1] = 0
-        elif key == keyboard.Key.down:
-            self.v[1] = 0
-        elif key == keyboard.Key.left:
-            self.v[0] = 0
-        elif key == keyboard.Key.right:
-            self.v[0] = 0
-        elif hasattr(key, "char"):
-            if key.char == "w":
-                self.v[2] = 0
-            elif key.char == "s":
-                self.v[2] = 0
+    #     Args:
+    #         key (pynput.keyboard.Key): The key that was released.
+    #     """
+    #     if key == keyboard.Key.up:
+    #         self.v[1] = 0
+    #     elif key == keyboard.Key.down:
+    #         self.v[1] = 0
+    #     elif key == keyboard.Key.left:
+    #         self.v[0] = 0
+    #     elif key == keyboard.Key.right:
+    #         self.v[0] = 0
+    #     elif hasattr(key, "char"):
+    #         if key.char == "w":
+    #             self.v[2] = 0
+    #         elif key.char == "s":
+    #             self.v[2] = 0
 
 
 def get_robot_type(robot_type: str):
