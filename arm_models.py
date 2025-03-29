@@ -779,6 +779,8 @@ class FiveDOFRobot:
         """
         ########################################
 
+        print(f"{EE.x=}, {EE.y=}, {EE.z=}")
+
         possible_solutions = []
         for i in range(8):
             possible_solutions.append([0, 0, 0, 0, 0])
@@ -837,10 +839,10 @@ class FiveDOFRobot:
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution
             if i % 2 is 0:
-                poss_soln[2] = float(-np.pi + beta)
+                poss_soln[2] = float(wraptopi(-np.pi + beta))
                 # print(f"{i}: pos")
             else:
-                poss_soln[2] = float(np.pi - beta)
+                poss_soln[2] = float(wraptopi(np.pi - beta))
                 # print(f"{i}: neg")
             possible_solutions[i] = poss_soln
             # print(f"{possible_solutions=}")
@@ -897,7 +899,7 @@ class FiveDOFRobot:
             r_3_5 = np.transpose(r_0_3) @ R
             # print(f"{r_3_5=}")
 
-            t4 = np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
+            t4 = np.pi + np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
             # print(f"{t4=}")
             t5 = np.arctan2(-r_3_5[2, 0], -r_3_5[2, 1])
             # print(f"{t5=}")
@@ -919,13 +921,14 @@ class FiveDOFRobot:
             self.calc_forward_kinematics(solution, True, False)
             EE_points_desired = [EE.x, EE.y, EE.z]  # desired
             EE_points_calc = self.points[5][:3]
+            print(f"desired: {EE_points_desired},   calc: {EE_points_calc}")
             valid_thetas = [False] * 5
             for i, theta in enumerate(solution):
                 if (
                     min(self.theta_limits[i][0], self.theta_limits[i][1])
                     < theta
                     < max(self.theta_limits[i][0], self.theta_limits[i][1])
-                ) or (
+                ) and (
                     all(
                         abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
                         for k in range(3)
