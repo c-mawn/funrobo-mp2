@@ -882,26 +882,40 @@ class FiveDOFRobot:
             t2 = solution[1]
             t3 = solution[2]
 
+            # r_1 = np.array(
+            #     [[np.cos(t1), 0, np.sin(t1)], [np.sin(t1), 0, -np.cos(t1)], [0, 1, 0]]
+            # )
+            # r_1_5 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+            # r_2 = np.array(
+            #     [[np.cos(t2), np.sin(t2), 0], [np.sin(t2), -np.cos(t2), 0], [0, 0, -1]]
+            # )
+            # r_3 = np.array(
+            #     [[np.cos(t3), np.sin(t3), 0], [np.sin(t3), -np.cos(t3), 0], [0, 0, -1]]
+            # )
+
             r_1 = np.array(
-                [[np.cos(t1), 0, np.sin(t1)], [np.sin(t1), 0, -np.cos(t1)], [0, 1, 0]]
+                [[np.cos(t1), 0, -np.sin(t1)], [np.sin(t1), 0, np.cos(t1)], [0, -1, 0]]
             )
-            r_1_5 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
             r_2 = np.array(
-                [[np.cos(t2), np.sin(t2), 0], [np.sin(t2), -np.cos(t2), 0], [0, 0, -1]]
+                [
+                    [np.cos(t2 - np.pi / 2), np.sin(t2 - np.pi / 2), 0],
+                    [np.sin(t2 - np.pi / 2), -np.cos(t2 - np.pi / 2), 0],
+                    [0, 0, 1],
+                ]
             )
             r_3 = np.array(
-                [[np.cos(t3), np.sin(t3), 0], [np.sin(t3), -np.cos(t3), 0], [0, 0, -1]]
+                [[np.cos(t3), np.sin(t3), 0], [np.sin(t3), -np.cos(t3), 0], [0, 0, 1]]
             )
 
-            r_0_3 = r_1 @ r_1_5 @ r_2 @ r_3
+            r_0_3 = r_1 @ r_2 @ r_3
             # print(f"{r_0_3=}")
 
             r_3_5 = np.transpose(r_0_3) @ R
             # print(f"{r_3_5=}")
 
-            t4 = np.pi + np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
+            t4 = np.arctan2(r_3_5[0, 2], r_3_5[1, 2]) - (np.pi / 2)
             # print(f"{t4=}")
-            t5 = np.arctan2(-r_3_5[2, 0], -r_3_5[2, 1])
+            t5 = np.arctan2(r_3_5[2, 1], r_3_5[2, 0])
             # print(f"{t5=}")
 
             solution[3] = float(t4)
