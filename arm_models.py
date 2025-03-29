@@ -830,6 +830,7 @@ class FiveDOFRobot:
                 poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
                 # print(f"{i}: offset")
             # print(f"{poss_soln=}")
+            # poss_soln[0] += float(np.pi) # tried adding this to fix offset, didnt work
             possible_solutions[i] = poss_soln
             # print(f"{possible_solutions=}")
 
@@ -839,7 +840,7 @@ class FiveDOFRobot:
                 poss_soln[2] = float(-np.pi + beta)
                 # print(f"{i}: pos")
             else:
-                float(np.pi - beta)
+                poss_soln[2] = float(np.pi - beta)
                 # print(f"{i}: neg")
             possible_solutions[i] = poss_soln
             # print(f"{possible_solutions=}")
@@ -901,14 +902,16 @@ class FiveDOFRobot:
             t5 = np.arctan2(-r_3_5[2, 0], -r_3_5[2, 1])
             # print(f"{t5=}")
 
-            solution[3] = t4
-            solution[4] = t5
+            solution[3] = float(t4)
+            solution[4] = float(t5)
+            possible_solutions[i] = solution
 
         for solution in possible_solutions:
             print(
                 f"[{round(degrees(solution[0]), 4)}, {round(degrees(solution[1]), 4)}, {round(degrees(solution[2]), 4)}, {round(degrees(solution[3]), 4)}, {round(degrees(solution[4]), 4)}]"
             )
 
+        print(f"{possible_solutions=}")
         # # Checking to see which of the 8 solutions are valid
         valid_solutions = []
 
@@ -922,7 +925,7 @@ class FiveDOFRobot:
                     min(self.theta_limits[i][0], self.theta_limits[i][1])
                     < theta
                     < max(self.theta_limits[i][0], self.theta_limits[i][1])
-                ) and (
+                ) or (
                     all(
                         abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
                         for k in range(3)
@@ -1059,7 +1062,6 @@ class FiveDOFRobot:
 
             # Set the end effector (EE) position
             self.ee.x, self.ee.y, self.ee.z = self.points[-1][:3]
-
             # Extract and assign the RPY (roll, pitch, yaw) from the rotation matrix
             rpy = rotm_to_euler(self.T_ee[:3, :3])
             self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[0], rpy[1], rpy[2]
