@@ -839,10 +839,10 @@ class FiveDOFRobot:
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution
             if i % 2 is 0:
-                poss_soln[2] = float(wraptopi(-np.pi + beta))
+                poss_soln[2] = float(-np.pi + beta)
                 # print(f"{i}: pos")
             else:
-                poss_soln[2] = float(wraptopi(np.pi - beta))
+                poss_soln[2] = float(np.pi - beta)
                 # print(f"{i}: neg")
             possible_solutions[i] = poss_soln
             # print(f"{possible_solutions=}")
@@ -913,7 +913,7 @@ class FiveDOFRobot:
             r_3_5 = np.transpose(r_0_3) @ R
             # print(f"{r_3_5=}")
 
-            t4 = np.arctan2(r_3_5[0, 2], r_3_5[1, 2]) - (np.pi / 2)
+            t4 = np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
             # print(f"{t4=}")
             t5 = np.arctan2(r_3_5[2, 1], r_3_5[2, 0])
             # print(f"{t5=}")
@@ -944,7 +944,7 @@ class FiveDOFRobot:
                     < max(self.theta_limits[i][0], self.theta_limits[i][1])
                 ) and (
                     all(
-                        abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.1
+                        abs(EE_points_desired[k] - EE_points_calc[k]) <= 0.01
                         for k in range(3)
                     )
                 ):
