@@ -25,11 +25,11 @@ Input those values into the inverse kinematics solver. Do not round the values! 
 For accuracy: compare the inputs in the solver to the outputs at the bottom of the screen. 
 
 Analytical IK (Solution 1)
-<img src = "/home/malkathamatehet/funrobo-mp2/assets/analytical_ik_1.png">
+<img src = "assets/analytical_ik_1.png">
 Analytical IK (Solution 2)
-<img src = "/home/malkathamatehet/funrobo-mp2/assets/analytical_ik_2.png">
+<img src = "assets/analytical_ik_2.png">
 Numerical IK
-<img src = "/home/malkathamatehet/funrobo-mp2/assets/numerical_ik.png">
+<img src = "assets/numerical_ik.png">
 
 ### Extra
 For more resources on using the visualizer, see [this repo](https://github.com/OlinCollege-FunRobo/arm-kinematics-module). 
