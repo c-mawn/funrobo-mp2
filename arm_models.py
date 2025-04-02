@@ -679,18 +679,15 @@ class FiveDOFRobot:
         )  # Denavit-Hartenberg parameters (theta, d, a, alpha)
         # Transformation matrices
 
+        # Initializes H matrices as empty
         self.H_01 = np.empty((4, 4))
         self.H_12 = np.empty((4, 4))
         self.H_23 = np.empty((4, 4))
         self.H_34 = np.empty((4, 4))
         self.H_45 = np.empty((4, 4))
 
+        # initializes T matrix as empty
         self.T = np.zeros((self.num_dof, 4, 4))
-        # print(self.T)
-
-        ########################################
-
-        ########################################
 
     def calc_forward_kinematics(self, theta: list, radians=False, update_robot=True):
         """
@@ -699,20 +696,29 @@ class FiveDOFRobot:
         Args:
             theta: List of joint angles (in degrees or radians).
             radians: Boolean flag to indicate if input angles are in radians.
+            update_robot: boolean flag to indicate whether the robot gets
+                updated when calling this function. Used primarily to validate
+                inverse kinematics solutions.
         """
         if not radians:
+            # changes all angles to radians for math if the input was in degrees
             theta = [np.deg2rad(angle) for angle in theta]
 
+        # calculates the dh table based on the passed in thetas
         self.H_01 = dh_to_matrix([theta[0], self.l1, 0, -PI / 2])
         self.H_12 = dh_to_matrix([theta[1] - PI / 2, 0, self.l2, PI])
         self.H_23 = dh_to_matrix([theta[2], 0, self.l3, PI])
         self.H_34 = dh_to_matrix([theta[3] + PI / 2, 0, 0, PI / 2])
         self.H_45 = dh_to_matrix([theta[4], self.l4 + self.l5, 0, 0])
 
+        # calculates the full H and T matrix from base to EE
         self.H05 = self.H_01 @ self.H_12 @ self.H_23 @ self.H_34 @ self.H_45
         self.T = [self.H_01, self.H_12, self.H_23, self.H_34, self.H_45]
+
+        # updates the actual robot thetas if desired
         if update_robot:
             self.theta = theta
+
         # Debug prints to verify the transformation matrices
         # print("Transformation Matrices:")
         # for i, T in enumerate(self.T):
@@ -723,57 +729,45 @@ class FiveDOFRobot:
 
     def jacobian_v(self):
         """
-        blah blah
+        Given the current self.theta, uses the H matrices to calculate the
+        jacobian matrix for the robot.
 
-
+        Returns:
+            J: np.array of the full jacobian matrix
         """
-        # if theta is None:
-        # theta = self.theta
 
-        # Initialize a 3x5 matrix for jacobian
-        # for first col, take offset vector from H05, and put in first col of matrix
-        # for next col, calc offset to be H05 offset - offset between H01
-        # continue doing this for each offset
-        # combine all collumns into jacobian matrix
-        # return jacobian
-
+        # initializes the empty Jacobian matrix
         J = np.empty((3, 5))
 
+        # calculates first column of matrix
         t1 = self.H05[0:3, 3]
         r1 = np.array([0, 0, 1])
         j1 = np.cross(r1, t1)
         J[0:3, 0] = j1
 
+        # calculates second column of matrix
         t2 = self.H05[0:3, 3] - self.H_01[0:3, 3]
         r2 = self.H_01[0:3, 2]
         j2 = np.cross(r2, t2)
         J[0:3, 1] = j2
 
+        # calculates third column of matrix
         t3 = self.H05[0:3, 3] - (self.H_01 @ self.H_12)[0:3, 3]
         r3 = (self.H_01 @ self.H_12)[0:3, 2]
         j3 = np.cross(r3, t3)
         J[0:3, 2] = j3
 
+        # calculates fourth column of matrix
         t4 = self.H05[0:3, 3] - (self.H_01 @ self.H_12 @ self.H_23)[0:3, 3]
         r4 = (self.H_01 @ self.H_12 @ self.H_23)[0:3, 2]
         j4 = np.cross(r4, t4)
         J[0:3, 3] = j4
 
+        # calculates fifth column of matrix
         t5 = self.H05[0:3, 3] - (self.H_01 @ self.H_12 @ self.H_23 @ self.H_34)[0:3, 3]
         r5 = (self.H_01 @ self.H_12 @ self.H_23 @ self.H_34)[0:3, 2]
         j5 = np.cross(r5, t5)
         J[0:3, 4] = j5
-        # offset_12 = self.H_12[0:3, 3]
-        # r3 = r2 - offset_12
-        # J[0:3, 2] = r3
-
-        # offset_23 = self.H_23[0:3, 3]
-        # r4 = r3 - offset_23
-        # J[0:3, 1] = r4
-
-        # offset_34 = self.H_34[0:3, 3]
-        # r5 = r4 - offset_34
-        # J[0:3, 0] = r5
 
         return J
 
@@ -785,9 +779,10 @@ class FiveDOFRobot:
             the pseudo inverse of the jacobian matrix
         """
         J = self.jacobian_v()
-        # print(f"J {J} inv {np.linalg.pinv(J)}")
 
-        # Calculate pinv of the jacobian
+        # Calculate pseudo inverse of the jacobian matrix
+        # The method used is to minimize the effects of singularities on
+        # the robot
         lambda_constant = 0.01
         J_inv = np.transpose(J) @ np.linalg.inv(
             ((J @ np.transpose(J)) + lambda_constant**2 * np.identity(3))
@@ -805,74 +800,85 @@ class FiveDOFRobot:
         """
         ########################################
 
-        print(f"{EE.x=}, {EE.y=}, {EE.z=}")
+        # print(f"{EE.x=}, {EE.y=}, {EE.z=}")
 
+        # initializes our possible solution list
         possible_solutions = []
         for i in range(8):
             possible_solutions.append([0, 0, 0, 0, 0])
 
+        # extract euler angles from our end effector object
         euler_angles = (EE.rotx, EE.roty, EE.rotz)
-        print(f"{euler_angles=}")
-        R = np.array(euler_to_rotm(euler_angles), dtype=float)
-        print(f"{R=}")
-        # rot_mat = np.array(list(R), dtype=float)
+        # print(f"{euler_angles=}")
 
+        # calculates rotation matrix from the the euler angles
+        R = np.array(euler_to_rotm(euler_angles), dtype=float)
+        # print(f"{R=}")
+
+        # extract the end effector location from the ee object
         ee_location = np.array([EE.x, EE.y, EE.z], dtype=float)
-        print(f"{ee_location=}")
+        # print(f"{ee_location=}")
+
+        # calculates the position of the wrist
         Pw = np.array([], dtype=float)
         Pw = ee_location - (self.l4 + self.l5) * (
             R @ np.transpose(np.array([0, 0, 1], dtype=float))
         )
-        print(f"{Pw=}")
+        # print(f"{Pw=}")
 
+        # calculates intermediary values used in calculating
+        # thetas 1-3
         s = Pw[2] - self.l1
-        # print(f"{s=}")
         r = np.sqrt((Pw[0] ** 2) + (Pw[1] ** 2))
-        # print(f"{r=}")
         L = np.sqrt((s**2) + (r**2))
-        # print(f"{L=}")
         beta = np.arccos(
             np.clip((self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3), -1, 1)
         )
-        # print(f"{beta=}")
 
-        # Add both theta 1 cases to seperate poss solutions
-        # for each of those add a possible theta 3 poss solution
-        # for each of those 4 poss solns, calc theta 2
+        # Calculates all the possible solutions using 4 for loops
+        # after all 4 loops, the goal is to build out all 8 possible solutions
+        # The possible_solutions list contains all these values, in a structure
+        # that looks like:
+        # 1: [norm,   +, +, t4, t5]
+        # 2: [norm,   +, -, t4, t5]
+        # 3: [norm,   -, +, t4, t5]
+        # 4: [norm,   -, -, t4, t5]
+        # 5: [offset, +, +, t4, t5]
+        # 6: [offset, +, -, t4, t5]
+        # 7: [offset, -, +, t4, t5]
+        # 8: [offset, -, -, t4, t5]
+        # We have 8 possible permutations of thetas 1-3, then we calc theta 4,5
+        # based on all those permutations
 
-        # 1: norm ---- (+) -- (+)
-        # 2: norm ---- (-) -- (+)
-        # 3: norm ---- (+) -- (-)
-        # 4: norm ---- (-) -- (-)
-        # 1: offset -- (+) -- (+)
-        # 2: offset -- (-) -- (+)
-        # 3: offset -- (+) -- (-)
-        # 4: offset -- (-) -- (-)
-        # print(f"{possible_solutions=}")
+        # Calculates both possibilities of theta 1, and starts building
+        # the possible_solutions list
         for i, solution in enumerate(possible_solutions):
-            poss_soln = solution  # should be just 5 0s
+            poss_soln = solution
+            # cuts the 8 possible solutions in half, the first 4 getting one
+            # possible theta 1 solution, and the last for getting the others
             if i < (len(possible_solutions) / 2):
                 poss_soln[0] = float(np.arctan2(Pw[1], Pw[0]))
                 # print(f"{i}: norm")
             else:
                 poss_soln[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
                 # print(f"{i}: offset")
-            # print(f"{poss_soln=}")
-            # poss_soln[0] += float(np.pi) # tried adding this to fix offset, didnt work
-            possible_solutions[i] = poss_soln
-            # print(f"{possible_solutions=}")
 
+            # appends each theta 1 solution to all of the possible soln
+            possible_solutions[i] = poss_soln
+
+        # Calculates theta 3 for all of the possible solutions
         for i, solution in enumerate(possible_solutions):
             poss_soln = solution
+            # alternates which theta 2 soln is calculated
             if i % 2 is 0:
                 poss_soln[2] = float(-np.pi + beta)
-                # print(f"{i}: pos")
             else:
                 poss_soln[2] = float(np.pi - beta)
-                # print(f"{i}: neg")
-            possible_solutions[i] = poss_soln
-            # print(f"{possible_solutions=}")
 
+            # appends each theta 2 to the possible solutions
+            possible_solutions[i] = poss_soln
+
+        # Calculates theta 2 in the ++,-- order
         for i, solution in enumerate(possible_solutions):
             if i % 2 == 0:
                 for j in range(2):
@@ -902,23 +908,14 @@ class FiveDOFRobot:
                 break
             # print(f"{possible_solutions=}")
 
+        # calculates thetas 4 and 5 based on thetas 1-3 for each possible soln
         for i, solution in enumerate(possible_solutions):
 
             t1 = solution[0]
             t2 = solution[1]
             t3 = solution[2]
 
-            # r_1 = np.array(
-            #     [[np.cos(t1), 0, np.sin(t1)], [np.sin(t1), 0, -np.cos(t1)], [0, 1, 0]]
-            # )
-            # r_1_5 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
-            # r_2 = np.array(
-            #     [[np.cos(t2), np.sin(t2), 0], [np.sin(t2), -np.cos(t2), 0], [0, 0, -1]]
-            # )
-            # r_3 = np.array(
-            #     [[np.cos(t3), np.sin(t3), 0], [np.sin(t3), -np.cos(t3), 0], [0, 0, -1]]
-            # )
-
+            # creating rotation matrices for each part of the robot
             r_1 = np.array(
                 [[np.cos(t1), 0, -np.sin(t1)], [np.sin(t1), 0, np.cos(t1)], [0, -1, 0]]
             )
@@ -939,6 +936,7 @@ class FiveDOFRobot:
             r_3_5 = np.transpose(r_0_3) @ R
             # print(f"{r_3_5=}")
 
+            # calculates theta 4 and 5
             t4 = np.arctan2(r_3_5[1, 2], r_3_5[0, 2])
             # print(f"{t4=}")
             t5 = np.arctan2(r_3_5[2, 1], r_3_5[2, 0])
@@ -948,22 +946,31 @@ class FiveDOFRobot:
             solution[4] = float(t5)
             possible_solutions[i] = solution
 
-        for solution in possible_solutions:
-            print(
-                f"[{round(degrees(solution[0]), 4)}, {round(degrees(solution[1]), 4)}, {round(degrees(solution[2]), 4)}, {round(degrees(solution[3]), 4)}, {round(degrees(solution[4]), 4)}]"
-            )
+        # uncomment below to print the thetas for each solution
+        # for solution in possible_solutions:
+        #     print(
+        #         f"[{round(degrees(solution[0]), 4)}, {round(degrees(solution[1]), 4)}, {round(degrees(solution[2]), 4)}, {round(degrees(solution[3]), 4)}, {round(degrees(solution[4]), 4)}]"
+        #     )
 
-        print(f"{possible_solutions=}")
-        # # Checking to see which of the 8 solutions are valid
-        valid_solutions = []
+        # print(f"{possible_solutions=}")
+
+        # goes through each possible solution calculated, then checks each one
+        # for feasability and accuracy
+
+        valid_solutions = []  # initializes the valid solutions
 
         for solution in possible_solutions:
+            # calculates the forward kinematics, specifically without updating
+            # the robot
             self.calc_forward_kinematics(solution, True, False)
-            EE_points_desired = [EE.x, EE.y, EE.z]  # desired
-            EE_points_calc = self.points[5][:3]
+            EE_points_desired = [EE.x, EE.y, EE.z]  # ee location inputted
+            EE_points_calc = self.points[5][:3]  # ee location calculated
             print(f"desired: {EE_points_desired},   calc: {EE_points_calc}")
             valid_thetas = [False] * 5
             for i, theta in enumerate(solution):
+                # checks the possible solutions on 2 criteria:
+                #   1: all the thetas are within the theta limits of the robot
+                #   2: the solution is accurate based on the fpk solution
                 if (
                     min(self.theta_limits[i][0], self.theta_limits[i][1])
                     < theta
@@ -975,74 +982,62 @@ class FiveDOFRobot:
                     )
                 ):
                     valid_thetas[i] = True
+            # after checking the criteria for all thetas, append to the valid
+            # solutions list
             if all(valid_thetas):
                 valid_solutions.append(solution)
 
         print(f"{valid_solutions=}")
 
+        # This block tells the visulaizer which solutions to show,
+        # if only 1 valid solutions exists, it always shows that one
+        # if there are 2 or more, it shows the first 2 valid solns, but
+        # if you know that there are more valid soln, change the indexing to
+        # visulaize the other solutions.
         if soln == 0 or len(valid_solutions) == 1:
             self.theta = valid_solutions[0]
         else:
             self.theta = valid_solutions[1]
 
-        # if soln == 1:
-        #     self.theta[0] = float(wraptopi(np.pi + np.arctan2(Pw[1], Pw[0])))
-        #     self.theta[2] = float(-np.pi + beta)
-        #     self.theta[1] = float(
-        #         np.arctan2(r, s)
-        #         - np.arctan2(
-        #             self.l3 * np.sin(-self.theta[2]),
-        #             (self.l2 + self.l3 * np.cos(-self.theta[2])),
-        #         )
-        #     )
-        #     # print(f"{self.theta=} {L=}")
-        #     # print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
-        #     # print(f"{R=}")
-
-        # else:
-        #     self.theta[0] = float(wraptopi(np.arctan2(Pw[1], Pw[0])))
-        #     self.theta[2] = float(np.pi - beta)
-        #     self.theta[1] = float(
-        #         np.arctan2(r, s)
-        #         + np.arctan2(
-        #             self.l3 * np.sin(-self.theta[2]),
-        #             (self.l2 + self.l3 * np.cos(-self.theta[2])),
-        #         )
-        #     )
-        # print(f"{self.theta=} {L=}")
-        # print(f"{(self.l2**2 + self.l3**2 - L**2) / (2 * self.l2 * self.l3)}")
-        # print(f"{R=}")
-
+        # updates the robot with the valid solutions.
         self.calc_forward_kinematics(self.theta, radians=True)
-        # self.calc_robot_points()
 
         ########################################
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
-        """Calculate numerical inverse kinematics based on input coordinates."""
+        """
+        Calculate numerical inverse kinematics based on input coordinates.
+
+        Args:
+            EE: EndEffector object containing the desired ee location
+            tol: float representing how close the code needs to get to the
+                actual ee location before it can complete
+            ilimit: int representing the max number of iterations before it
+                gives up on finding a better solution
+        """
 
         x_ee, y_ee, z_ee = EE.x, EE.y, EE.z
-        # rot_x, rot_y, rot_z = EE.rotx, EE.roty, EE.rotz
 
         ########################################
-        # insert your code here
+        # sets current thetas to theta, which is used in calculations
         theta = self.theta
 
         i = 0
 
+        # iterates through until we reach the max iteration number
         while i < ilimit:
             self.calc_forward_kinematics(theta, radians=True)
-            # err = np.sqrt(
-            #     (self.ee.x - x_ee) ** 2
-            #     + (self.ee.y - y_ee) ** 2
-            #     + (self.ee.z - z_ee) ** 2
-            # )
+            # calculates the error between
             err = np.transpose([x_ee - self.ee.x, y_ee - self.ee.y, z_ee - self.ee.z])
 
+            # checks to see if the ee is close enough to the desired location
             if np.linalg.norm(err) > tol:
+                # if the error is too big, calculate the next step closer to
+                # the desired ee location
                 theta = theta + (self.inverse_jacobian() @ err) * 0.1
                 print(self.inverse_jacobian() @ err)
             else:
+                # if the error is within the tolerance, then break the loop
                 print("position found")
                 self.theta = theta
                 break
@@ -1066,12 +1061,6 @@ class FiveDOFRobot:
         ########################################
         # at every time step, inverse inverse jacboan * cartesian
         time_step = 0.01
-
-        # check for singularity, and adjust by nudging angles slightly
-        # threshold = 0.001
-        # if any(abs(val) < threshold for val in self.theta):
-        #     for i in range(len(self.theta)):
-        #         self.theta[i] = np.random.uniform(0, 0.1)
 
         q_dot = self.inverse_jacobian() @ np.array(vel)
         self.theta = self.theta + time_step * np.array(q_dot)
@@ -1104,7 +1093,9 @@ class FiveDOFRobot:
             self.T_ee = T_cumulative[-1]  # Final transformation matrix for EE
 
             # Set the end effector (EE) position
-            self.ee.x, self.ee.y, self.ee.z = self.points[-1][:3]
+            self.ee.x, self.ee.y, self.ee.z = self.points[-1][
+                :3
+            ]  # pylint: disable=unsubscriptable-object
             # Extract and assign the RPY (roll, pitch, yaw) from the rotation matrix
             rpy = rotm_to_euler(self.T_ee[:3, :3])
             self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[0], rpy[1], rpy[2]
@@ -1112,5 +1103,7 @@ class FiveDOFRobot:
             # Calculate the EE axes in space (in the base frame)
             self.EE = [self.ee.x, self.ee.y, self.ee.z]
             self.EE_axes = np.array(
-                [self.T_ee[:3, i] * 0.075 + self.points[-1][:3] for i in range(3)]
+                [
+                    self.T_ee[:3, i] * 0.075 + self.points[-1][:3] for i in range(3)
+                ]  # pylint: disable=unsubscriptable-object
             )
